@@ -55,9 +55,9 @@ export namespace Telegram {
 
     private text(payload: Deployment.DTO.Create): string {
       return [
-        `🔍 <b>New deployment detected in repository</b> <code>${payload.repository}</code>`,
+        `🔍 <b>Обнаружен новый деплой в репозитории</b> <code>${payload.repository}</code>`,
         ``,
-        `Triggered by <i>"${Utils.escapeHtml(payload.name)}"</i> in branch <code>${Utils.escapeHtml(payload.branch)}</code> for commit <code>${Utils.escapeHtml(payload.commit)}</code> by <b>${Utils.escapeHtml(payload.by)}</b>`,
+        `Запущено коммитом <i>"${Utils.escapeHtml(payload.name)}"</i> в ветке <code>${Utils.escapeHtml(payload.branch)}</code> с айди <code>${Utils.escapeHtml(payload.commit)}</code> разработчиком <b>${Utils.escapeHtml(payload.by)}</b>`,
         ``,
         this.format(payload),
       ].join('\n');
@@ -65,12 +65,12 @@ export namespace Telegram {
 
     private format(payload: Deployment.DTO.Create): string {
       const status = Telegram.Service.getStringStatus(payload.status);
-      return `• Status of job <code>${Utils.escapeHtml(payload.stage)}</code> is <b>${status.text}</b> ${status.icon}`;
+      return `• Статус задачи <code>${Utils.escapeHtml(payload.stage)}</code>: <b>${status.text}</b> ${status.icon}`;
     }
 
     private upsert(message: string, payload: Deployment.DTO.Create): string {
       const escaped = Utils.escapeHtml(payload.stage).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const pattern = new RegExp(`^• Status of job <code>${escaped}</code> is .*$`, 'gm');
+      const pattern = new RegExp(`^• Статус задачи <code>${escaped}</code>: .*$`, 'gm');
       const line = this.format(payload);
       if (pattern.test(message)) {
         return message.replace(pattern, line);
@@ -80,11 +80,11 @@ export namespace Telegram {
     }
 
     private static getStringStatus = (status: string): { icon: string, text: string } => ({
-      success: { icon: '✅', text: 'Success' },
-      failed: { icon: '⚠️', text: 'Failed' },
-      pending: { icon: '🕑', text: 'Pending' },
-      running: { icon: '🕑', text: 'Running' },
-      canceled: { icon: '❌', text: 'Canceled' },
+      success: { icon: '✅', text: 'Успешно' },
+      failed: { icon: '⚠️', text: 'Ошибка' },
+      pending: { icon: '🕑', text: 'Ожидание' },
+      running: { icon: '🕑', text: 'Выполняется' },
+      canceled: { icon: '❌', text: 'Отменено' },
     })[status] ?? { icon: '❓', text: Utils.escapeHtml(status) };
 
     onModuleDestroy(): void {
