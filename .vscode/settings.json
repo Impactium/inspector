@@ -1,0 +1,11 @@
+{
+  "files.autoSave": "off",
+  "workbench.startupEditor": "terminal",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "always",
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "vscode.typescript-language-features"
+  },
+}

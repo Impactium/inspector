@@ -1,0 +1,11 @@
+{
+  "configurations": [
+    {
+      "type": "node-terminal",
+      "name": "Start",
+      "request": "launch",
+      "command": "pnpm run start:dev",
+      "envFile": "${workspaceFolder}/.env"
+    }
+  ]
+}

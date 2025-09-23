@@ -1,0 +1,14 @@
+name: inspector
+
+services:
+  api:
+    build:
+      context: .
+    container_name: ${COMPOSE_PROJECT_NAME}-api
+    restart: always
+    networks:
+      - default
+
+networks:
+  default:
+    driver: bridge
