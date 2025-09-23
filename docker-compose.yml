@@ -5,6 +5,7 @@ services:
     build:
       context: .
     container_name: ${COMPOSE_PROJECT_NAME}-api
+    command: pnpm run start:prod
     restart: always
     networks:
       - default

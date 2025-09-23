@@ -5,5 +5,3 @@ WORKDIR /api
 COPY . .
 RUN pnpm install
 RUN pnpm -r run build
-
-CMD ['pnpm', 'run', 'start']
