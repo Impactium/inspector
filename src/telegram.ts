@@ -15,6 +15,7 @@ export namespace Telegram {
     export interface Type {
       message: number;
       timer: NodeJS.Timeout;
+      text: string;
     }
     export const TTL = 1000 * 60 * 30;
   }
@@ -25,43 +26,57 @@ export namespace Telegram {
     private readonly cache = new Map<string, Telegram.Cache.Type>();
 
     async send(payload: Deployment.DTO.Create): Promise<void> {
-      const text = this.text(payload);
+      const entry = this.cache.get(payload.commit);
 
-      const existing = this.cache.get(payload.commit);
-      if (existing) {
-        clearTimeout(existing.timer);
+      if (entry) {
+        const baseText = (entry.text ?? this.text(payload)).trimEnd();
+        const nextText = this.upsert(baseText, payload);
+
+        clearTimeout(entry.timer);
         const timer = setTimeout(() => this.cache.delete(payload.commit), Telegram.Cache.TTL);
-        this.cache.set(payload.commit, { message: existing.message, timer });
+        this.cache.set(payload.commit, { message: entry.message, timer, text: nextText });
 
-        await this.bot.api.editMessageText(CONSTRAINTS.CHAT_ID, existing.message, text, {
+        await this.bot.api.editMessageText(CONSTRAINTS.CHAT_ID, entry.message, nextText, {
           parse_mode: 'HTML',
-          link_preview_options: {
-            is_disabled: true
-          },
+          link_preview_options: { is_disabled: true },
         });
         return;
       }
 
+      const text = this.text(payload);
       const msg = await this.bot.api.sendMessage(CONSTRAINTS.CHAT_ID, text, {
         parse_mode: 'HTML',
-        link_preview_options: {
-          is_disabled: true
-        },
+        link_preview_options: { is_disabled: true },
       });
 
       const timer = setTimeout(() => this.cache.delete(payload.commit), Telegram.Cache.TTL);
-      this.cache.set(payload.commit, { message: msg.message_id, timer });
+      this.cache.set(payload.commit, { message: msg.message_id, timer, text });
     }
 
     private text(payload: Deployment.DTO.Create): string {
-      const status = Telegram.Service.getStringStatus(payload.status);
       return [
         `🔍 <b>New deployment detected in repository</b> <code>${payload.repository}</code>`,
         ``,
         `Triggered by <i>"${Utils.escapeHtml(payload.name)}"</i> in branch <code>${Utils.escapeHtml(payload.branch)}</code> for commit <code>${Utils.escapeHtml(payload.commit)}</code> by <b>${Utils.escapeHtml(payload.by)}</b>`,
         ``,
-        `• Status of job <code>${Utils.escapeHtml(payload.stage)}</code> is <b>${status.text}</b> ${status.icon}`
+        this.format(payload),
       ].join('\n');
+    }
+
+    private format(payload: Deployment.DTO.Create): string {
+      const status = Telegram.Service.getStringStatus(payload.status);
+      return `• Status of job <code>${Utils.escapeHtml(payload.stage)}</code> is <b>${status.text}</b> ${status.icon}`;
+    }
+
+    private upsert(message: string, payload: Deployment.DTO.Create): string {
+      const escaped = Utils.escapeHtml(payload.stage).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = new RegExp(`^• Status of job <code>${escaped}</code> is .*$`, 'gm');
+      const line = this.format(payload);
+      if (pattern.test(message)) {
+        return message.replace(pattern, line);
+      }
+      const newLine = message.endsWith('\n') ? '' : '\n';
+      return `${message}${newLine}${line}`;
     }
 
     private static getStringStatus = (status: string): { icon: string, text: string } => ({
