@@ -68,8 +68,9 @@ export namespace Telegram {
           return [
             `🔍 <b>Обнаружен новый деплой в репозитории</b> <code>${payload.repository}</code>`,
             ``,
-            `Данные:`,
-            `<code>${JSON.stringify(payload, null, 2)}</code>`,
+            `Запущено коммитом <i>"${Utils.escapeHtml(payload.name)}"</i> в ветке <code>${Utils.escapeHtml(payload.branch)}</code> с айди <code>${Utils.escapeHtml(payload.commit)}</code> разработчиком <b>${Utils.escapeHtml(payload.by)}</b>`,
+            ``,
+            this.format(payload)
           ].join('\n');
         case 'registration':
           return [
@@ -81,7 +82,7 @@ export namespace Telegram {
       }
     }
 
-    private format(payload: Deployment.DTO.Create): string {
+    private format(payload: Record<string, any>): string {
       const status = Telegram.Service.getStringStatus(payload.status);
       return `• Статус задачи <code>${Utils.escapeHtml(payload.stage)}</code>: <b>${status.text}</b> ${status.icon}`;
     }
