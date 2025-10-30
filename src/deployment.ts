@@ -75,7 +75,7 @@ export namespace Deployment {
     @Post()
     @HttpCode(200)
     post(@Body() payload: Deployment.DTO.Create) {
-      this.telegramService.send(payload);
+      this.telegramService.deployment(payload);
 
       return { ok: true };
     }

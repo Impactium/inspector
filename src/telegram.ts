@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Module as NestModule } from '@nestjs/common';
 import { Bot } from 'grammy';
 import { Utils } from "./utils";
@@ -7,8 +7,9 @@ import { Deployment } from "./deployment";
 
 export namespace Telegram {
   export const CONSTRAINTS = {
-    CHAT_ID: process.env.TELEGRAM_CHAT_ID || Utils._throw(ApplicationError.EnvironmentKeyNotProvided.new('TELEGRAM_CHAT_ID')),
-    TOKEN: process.env.TELEGRAM_TOKEN || Utils._throw(ApplicationError.EnvironmentKeyNotProvided.new('TELEGRAM_TOKEN'))
+    TOKEN: process.env.TELEGRAM_TOKEN || Utils._throw(ApplicationError.EnvironmentKeyNotProvided.new('TELEGRAM_TOKEN')),
+    DEPLOYMENT_CHAT_ID: process.env.TELEGRAM_DEPLOYMENT_CHAT_ID || Utils._throw(ApplicationError.EnvironmentKeyNotProvided.new('TELEGRAM_DEPLOYMENT_CHAT_ID')),
+    REGISTRATION_CHAT_ID: process.env.TELEGRAM_REGISTRATION_CHAT_ID || Utils._throw(ApplicationError.EnvironmentKeyNotProvided.new('TELEGRAM_REGISTRATION_CHAT_ID')),
   } as const;
 
   export namespace Cache {
@@ -25,26 +26,27 @@ export namespace Telegram {
     private readonly bot = new Bot(CONSTRAINTS.TOKEN);
     private readonly cache = new Map<string, Telegram.Cache.Type>();
 
-    async send(payload: Deployment.DTO.Create): Promise<void> {
+    async deployment(payload: Deployment.DTO.Create): Promise<void> {
       const entry = this.cache.get(payload.commit);
 
+      const text = this.text('deployment', payload);
+
       if (entry) {
-        const baseText = (entry.text ?? this.text(payload)).trimEnd();
+        const baseText = (entry.text ?? text).trimEnd();
         const nextText = this.upsert(baseText, payload);
 
         clearTimeout(entry.timer);
         const timer = setTimeout(() => this.cache.delete(payload.commit), Telegram.Cache.TTL);
         this.cache.set(payload.commit, { message: entry.message, timer, text: nextText });
 
-        await this.bot.api.editMessageText(CONSTRAINTS.CHAT_ID, entry.message, nextText, {
+        await this.bot.api.editMessageText(CONSTRAINTS.DEPLOYMENT_CHAT_ID, entry.message, nextText, {
           parse_mode: 'HTML',
           link_preview_options: { is_disabled: true },
         });
         return;
       }
 
-      const text = this.text(payload);
-      const msg = await this.bot.api.sendMessage(CONSTRAINTS.CHAT_ID, text, {
+      const msg = await this.bot.api.sendMessage(CONSTRAINTS.DEPLOYMENT_CHAT_ID, text, {
         parse_mode: 'HTML',
         link_preview_options: { is_disabled: true },
       });
@@ -53,14 +55,30 @@ export namespace Telegram {
       this.cache.set(payload.commit, { message: msg.message_id, timer, text });
     }
 
-    private text(payload: Deployment.DTO.Create): string {
-      return [
-        `🔍 <b>Обнаружен новый деплой в репозитории</b> <code>${payload.repository}</code>`,
-        ``,
-        `Запущено коммитом <i>"${Utils.escapeHtml(payload.name)}"</i> в ветке <code>${Utils.escapeHtml(payload.branch)}</code> с айди <code>${Utils.escapeHtml(payload.commit)}</code> разработчиком <b>${Utils.escapeHtml(payload.by)}</b>`,
-        ``,
-        this.format(payload),
-      ].join('\n');
+    async registration(payload: Record<string, string>): Promise<void> {
+      this.bot.api.sendMessage(CONSTRAINTS.REGISTRATION_CHAT_ID, this.text('registration', payload), {
+        parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true },
+      });
+    }
+
+    private text(use: 'deployment' | 'registration', payload: Record<string, any>): string {
+      switch (use) {
+        case 'deployment':
+          return [
+            `🔍 <b>Обнаружен новый деплой в репозитории</b> <code>${payload.repository}</code>`,
+            ``,
+            `Данные:`,
+            `<code>${JSON.stringify(payload, null, 2)}</code>`,
+          ].join('\n');
+        case 'registration':
+          return [
+            `<b>🟢 Новая регистрация</b>`,
+            ``,
+            `Данные:`,
+            `<code>${JSON.stringify(payload, null, 2)}</code>`,
+          ].join('\n');
+      }
     }
 
     private format(payload: Deployment.DTO.Create): string {
