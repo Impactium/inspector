@@ -35,14 +35,15 @@ export namespace Domain {
         }
       }
 
-      setTimeout(this.all, 60);
+      setTimeout(this.all, 1000 * 60);
     }
 
     update(url: string, alive: boolean, reason = '') {
-      this.alive[alive ? 'add' : 'delete'](url);
       if (alive) {
+        this.alive.add(url);
         this.telegramService.alive(url);
       } else {
+        this.alive.delete(url);
         this.telegramService.dead(url, reason);
       }
     };
