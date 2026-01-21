@@ -11,7 +11,7 @@ services:
       - 1488:1488
     restart: always
     volumes:
-      - ./domains.json:/api/domains.json
+      - ./domains.json:/domains.json
     networks:
       - default
 

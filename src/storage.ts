@@ -2,10 +2,6 @@ import * as fs from 'fs/promises';
 import { resolve } from "path";
 
 export class Storage {
-  constructor() {
-    console.log(process.cwd());
-  }
-
   public static readonly FILE = resolve(process.cwd(), '/domains.json');
 
   public static get = (): Promise<Set<string>> => fs.readFile(Storage.FILE, 'utf-8').then(domains => new Set(JSON.parse(domains)))
