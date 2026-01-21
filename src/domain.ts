@@ -27,28 +27,28 @@ export namespace Domain {
       setTimeout(this.all, 60);
     }
 
-    check = (url: string) => fetch(url)
-      .then(() => {
+    async check(url: string) {
+      try {
+        await fetch(url);
         const isAlive = this.alive.has(url);
         if (!isAlive) {
           this.update(url, true);
         }
-      })
-      .catch(error => {
+      } catch (error) {
         const isAlive = this.alive.has(url);
         if (isAlive) {
           this.update(url, false, error.cause.code);
         }
-      });
+      }
+    }
 
-    update = (url: string, alive: boolean, reason = '') => {
+    update(url: string, alive: boolean, reason = '') {
       this.alive[alive ? 'add' : 'delete'](url);
       if (alive) {
-        this.telegramService.dead(url, reason)
+        this.telegramService.alive(url);
       } else {
-        this.telegramService.alive(url)
+        this.telegramService.dead(url, reason);
       }
-
     };
   }
 
