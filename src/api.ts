@@ -3,12 +3,16 @@ import { RequestMiddleware } from './middlewares/request.middleware';
 import { ResponseMiddleware } from './middlewares/response.middleware';
 import { Deployment } from './deployment';
 import { Registration } from './registration';
+import { Telegram } from './telegram';
+import { Domain } from './domain';
 
 export namespace Api {
   @AppModule({
     imports: [
+      Telegram.Module,
       Deployment.Module,
-      Registration.Module
+      Registration.Module,
+      Domain.Module
     ]
   })
   export class Module implements NestModule {

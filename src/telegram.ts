@@ -1,15 +1,18 @@
-import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Module as NestModule } from '@nestjs/common';
 import { Bot } from 'grammy';
 import { Utils } from "./utils";
 import { ApplicationError } from "./error";
 import { Deployment } from "./deployment";
+import { Domain } from "./domain";
+import { Storage } from "./storage";
 
 export namespace Telegram {
   export const CONSTRAINTS = {
     TOKEN: process.env.TELEGRAM_TOKEN || Utils._throw(ApplicationError.EnvironmentKeyNotProvided.new('TELEGRAM_TOKEN')),
     DEPLOYMENT_CHAT_ID: process.env.TELEGRAM_DEPLOYMENT_CHAT_ID || Utils._throw(ApplicationError.EnvironmentKeyNotProvided.new('TELEGRAM_DEPLOYMENT_CHAT_ID')),
     REGISTRATION_CHAT_ID: process.env.TELEGRAM_REGISTRATION_CHAT_ID || Utils._throw(ApplicationError.EnvironmentKeyNotProvided.new('TELEGRAM_REGISTRATION_CHAT_ID')),
+    DOMAIN_CHAT_ID: process.env.TELEGRAM_DOMAIN_CHAT_ID || Utils._throw(ApplicationError.EnvironmentKeyNotProvided.new('TELEGRAM_DOMAIN_CHAT_ID')),
   } as const;
 
   export namespace Cache {
@@ -22,9 +25,27 @@ export namespace Telegram {
   }
 
   @Injectable()
-  export class Service implements OnModuleDestroy {
+  export class Service implements OnModuleInit, OnModuleDestroy {
     private readonly bot = new Bot(CONSTRAINTS.TOKEN);
     private readonly cache = new Map<string, Telegram.Cache.Type>();
+
+    async onModuleInit() {
+      this.bot.command('add_domain', ctx => this.updateDomain(ctx.match, 'add', ctx));
+      this.bot.command('delete_domain', ctx => this.updateDomain(ctx.match, 'delete', ctx));
+
+      this.bot.on('callback_query:data', async ctx => {
+        const data = ctx.callbackQuery?.data;
+        if (!data) return;
+        if (data.startsWith('delete_')) {
+          const domain = data.replace('delete_', '');
+          await this.updateDomain(domain, 'delete', ctx);
+          await ctx.editMessageText(`<strong>⚠️ Домен удалён:</strong> <code>${domain}</code>`, { parse_mode: 'HTML' });
+          await ctx.answerCallbackQuery({ text: `Домен ${domain} удалён` });
+        }
+      });
+
+      this.bot.start();
+    }
 
     async deployment(payload: Deployment.DTO.Create): Promise<void> {
       const entry = this.cache.get(payload.commit);
@@ -61,6 +82,37 @@ export namespace Telegram {
         link_preview_options: { is_disabled: true },
       });
     }
+
+    async fall(domain: string, reason: string): Promise<void> {
+      this.bot.api.sendMessage(CONSTRAINTS.DOMAIN_CHAT_ID, `<strong>⚠️ Внимание!</strong>\nУпал домен <code>${domain}</code> по причине <code>${reason}</code>`, {
+        parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true },
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: 'Удалить домен', callback_data: `delete_${domain}` }]
+          ]
+        }
+      });
+    }
+
+    private async updateDomain(domain: string, action: 'add' | 'delete', ctx?: any) {
+      const domains = await Storage.get();
+
+      if (action === 'add') {
+        if (domains.has(domain)) return ctx?.reply(`Домен уже в списке: ${domain}`);
+        domains.add(domain);
+        await Storage.set(domains);
+        return ctx?.reply(`Добавлен домен: ${domain}`);
+      }
+
+      if (action === 'delete') {
+        if (!domains.has(domain)) return ctx?.reply(`Домен не найден: ${domain}`);
+        domains.delete(domain);
+        await Storage.set(domains);
+        return ctx?.reply(`Удалён домен: ${domain}`);
+      }
+    }
+
 
     private text(use: 'deployment' | 'registration', payload: Record<string, any>): string {
       switch (use) {
