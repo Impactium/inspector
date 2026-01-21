@@ -35,7 +35,7 @@ export namespace Domain {
         }
       }
 
-      setTimeout(this.all, 1000 * 60);
+      setTimeout(() => this.all(), 1000 * 60);
     }
 
     update(url: string, alive: boolean, reason = '') {
