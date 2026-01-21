@@ -21,25 +21,21 @@ export namespace Domain {
       const domains = await Storage.get();
 
       for (const url of domains) {
-        this.check(url);
+        try {
+          await fetch(url);
+          const isAlive = this.alive.has(url);
+          if (!isAlive) {
+            this.update(url, true);
+          }
+        } catch (error) {
+          const isAlive = this.alive.has(url);
+          if (isAlive) {
+            this.update(url, false, error.cause.code);
+          }
+        }
       }
 
       setTimeout(this.all, 60);
-    }
-
-    async check(url: string) {
-      try {
-        await fetch(url);
-        const isAlive = this.alive.has(url);
-        if (!isAlive) {
-          this.update(url, true);
-        }
-      } catch (error) {
-        const isAlive = this.alive.has(url);
-        if (isAlive) {
-          this.update(url, false, error.cause.code);
-        }
-      }
     }
 
     update(url: string, alive: boolean, reason = '') {
