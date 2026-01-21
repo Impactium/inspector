@@ -9,6 +9,8 @@ export namespace Domain {
   export class Service implements OnModuleInit {
     private readonly logger = new Logger(Domain.name);
 
+    private readonly alive = new Set<string>();
+
     constructor(
       private readonly telegramService: Telegram.Service
     ) { }
@@ -17,14 +19,37 @@ export namespace Domain {
 
     async all() {
       const domains = await Storage.get();
+
       for (const url of domains) {
         this.check(url);
       }
 
-      setTimeout(this.all, 1000 * 60 * 5);
+      setTimeout(this.all, 60);
     }
 
-    check = (url: string) => fetch(url).catch(error => this.telegramService.fall(url, error.cause.code));
+    check = (url: string) => fetch(url)
+      .then(() => {
+        const isAlive = this.alive.has(url);
+        if (!isAlive) {
+          this.update(url, true);
+        }
+      })
+      .catch(error => {
+        const isAlive = this.alive.has(url);
+        if (isAlive) {
+          this.update(url, false, error.cause.code);
+        }
+      });
+
+    update = (url: string, alive: boolean, reason = '') => {
+      this.alive[alive ? 'add' : 'delete'](url);
+      if (alive) {
+        this.telegramService.dead(url, reason)
+      } else {
+        this.telegramService.alive(url)
+      }
+
+    };
   }
 
   @NestModule({

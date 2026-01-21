@@ -83,8 +83,8 @@ export namespace Telegram {
       });
     }
 
-    async fall(domain: string, reason: string): Promise<void> {
-      this.bot.api.sendMessage(CONSTRAINTS.DOMAIN_CHAT_ID, `<strong>⚠️ Внимание!</strong>\nУпал домен <code>${domain}</code> по причине <code>${reason}</code>`, {
+    async dead(domain: string, reason: string): Promise<void> {
+      this.bot.api.sendMessage(CONSTRAINTS.DOMAIN_CHAT_ID, `<strong>⚠️ Домен упал!</strong>\n\Домен <code>${domain}</code> упал в <code>${new Date().toUTCString()}</code> по UTC.\n\nПричина: <code>${reason}</code>`, {
         parse_mode: 'HTML',
         link_preview_options: { is_disabled: true },
         reply_markup: {
@@ -92,6 +92,13 @@ export namespace Telegram {
             [{ text: 'Удалить домен', callback_data: `delete_${domain}` }]
           ]
         }
+      });
+    }
+
+    async alive(domain: string): Promise<void> {
+      this.bot.api.sendMessage(CONSTRAINTS.DOMAIN_CHAT_ID, `<strong>✅ Домен ожил!</strong>\n\n Домен <code>${domain}</code> ожил в <code>${new Date().toUTCString()}</code> по UTC`, {
+        parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true }
       });
     }
 
