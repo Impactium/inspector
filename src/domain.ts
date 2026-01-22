@@ -9,6 +9,8 @@ export namespace Domain {
   export class Service implements OnModuleInit {
     private readonly logger = new Logger(Domain.name);
 
+    private static readonly ignore = new Set(['EAI_AGAIN']);
+
     private readonly alive = new Set<string>();
 
     constructor(
@@ -28,9 +30,14 @@ export namespace Domain {
             this.update(url, true);
           }
         } catch (error) {
+          const { code } = error.cause;
+
+          if (Service.ignore.has(code))
+            return;
+
           const isAlive = this.alive.has(url);
           if (isAlive) {
-            this.update(url, false, error.cause.code);
+            this.update(url, false, code);
           }
         }
       }
