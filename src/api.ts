@@ -1,4 +1,5 @@
 import { MiddlewareConsumer, Module as AppModule, NestModule, RequestMethod } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { RequestMiddleware } from './middlewares/request.middleware';
 import { ResponseMiddleware } from './middlewares/response.middleware';
 import { Deployment } from './deployment';
@@ -9,6 +10,7 @@ import { Domain } from './domain';
 export namespace Api {
   @AppModule({
     imports: [
+      ScheduleModule.forRoot(),
       Telegram.Module,
       Deployment.Module,
       Registration.Module,

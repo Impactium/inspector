@@ -1,13 +1,14 @@
-import { Injectable, Logger, Module as NestModule, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger, Module as NestModule } from "@nestjs/common";
 import { Telegram } from "./telegram";
 import { Storage } from "./storage";
+import { Cron, CronExpression } from "@nestjs/schedule";
 
 export namespace Domain {
   export const name = 'Domain';
 
   @Injectable()
-  export class Service implements OnModuleInit {
-    private readonly logger = new Logger(Domain.name);
+  export class Service {
+    private static readonly logger = new Logger(Domain.name);
 
     private static readonly ignore = new Set(['EAI_AGAIN']);
 
@@ -17,32 +18,28 @@ export namespace Domain {
       private readonly telegramService: Telegram.Service
     ) { }
 
-    onModuleInit = () => this.all();
-
-    async all() {
+    @Cron(CronExpression.EVERY_MINUTE)
+    async checkAll() {
       const domains = await Storage.get();
+
+      Domain.Service.logger.log(`DOMAINS_LIST:${domains.size}`);
 
       for (const url of domains) {
         try {
           await fetch(url);
-          const isAlive = this.alive.has(url);
-          if (!isAlive) {
-            this.update(url, true);
-          }
+
+          if (!this.alive.has(url)) this.update(url, true);
         } catch (error) {
-          const { code } = error.cause;
+          const code = error.cause.code;
 
-          if (Service.ignore.has(code))
-            return;
-
-          const isAlive = this.alive.has(url);
-          if (isAlive) {
-            this.update(url, false, code);
+          if (Domain.Service.ignore.has(code)) {
+            Domain.Service.logger.verbose(`DOMAIN_ERROR_IGNORED:${url}`);
+            continue;
           }
+
+          if (this.alive.has(url)) this.update(url, false, code);
         }
       }
-
-      setTimeout(() => this.all(), 1000 * 60);
     }
 
     update(url: string, alive: boolean, reason = '') {
