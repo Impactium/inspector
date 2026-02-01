@@ -9,8 +9,8 @@ export namespace Domain {
   @Injectable()
   export class Service {
     private static readonly logger = new Logger(Domain.name);
-
     private static readonly ignore = new Set(['EAI_AGAIN']);
+    private static readonly MAX_RETRIES = 3;
 
     private readonly alive = new Set<string>();
 
@@ -21,23 +21,35 @@ export namespace Domain {
     @Cron(CronExpression.EVERY_MINUTE)
     async checkAll() {
       const domains = await Storage.get();
-
       Domain.Service.logger.log(`DOMAINS_LIST:${domains.size}`);
 
       for (const url of domains) {
-        try {
-          await fetch(url);
+        let lastError: any = null;
+        let success = false;
 
-          if (!this.alive.has(url)) this.update(url, true);
-        } catch (error) {
-          const code = error.cause.code;
+        for (let attempt = 1; attempt <= Domain.Service.MAX_RETRIES; attempt++) {
+          try {
+            await fetch(url);
+            success = true;
+            break;
+          } catch (error) {
+            const code = error?.cause?.code;
+            lastError = { error, code };
 
-          if (Domain.Service.ignore.has(code)) {
-            Domain.Service.logger.verbose(`DOMAIN_ERROR_IGNORED:${url}`);
-            continue;
+            if (Domain.Service.ignore.has(code)) {
+              Domain.Service.logger.verbose(`DOMAIN_ERROR_IGNORED:${url}`);
+              success = true;
+              break;
+            }
           }
+        }
 
-          if (this.alive.has(url)) this.update(url, false, code);
+        if (success) {
+          if (!this.alive.has(url)) this.update(url, true);
+        } else {
+          if (this.alive.has(url)) {
+            this.update(url, false, lastError?.code ?? 'UNKNOWN');
+          }
         }
       }
     }
@@ -50,7 +62,7 @@ export namespace Domain {
         this.alive.delete(url);
         this.telegramService.dead(url, reason);
       }
-    };
+    }
   }
 
   @NestModule({
