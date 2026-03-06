@@ -60,14 +60,14 @@ export namespace Telegram {
         const timer = setTimeout(() => this.cache.delete(payload.commit), Telegram.Cache.TTL);
         this.cache.set(payload.commit, { message: entry.message, timer, text: nextText });
 
-        await this.bot.api.editMessageText(CONSTRAINTS.DEPLOYMENT_CHAT_ID, entry.message, nextText, {
+        await this.editMessageTextWithRetry(CONSTRAINTS.DEPLOYMENT_CHAT_ID, entry.message, nextText, {
           parse_mode: 'HTML',
           link_preview_options: { is_disabled: true },
         });
         return;
       }
 
-      const msg = await this.bot.api.sendMessage(CONSTRAINTS.DEPLOYMENT_CHAT_ID, text, {
+      const msg = await this.sendMessageWithRetry(CONSTRAINTS.DEPLOYMENT_CHAT_ID, text, {
         parse_mode: 'HTML',
         link_preview_options: { is_disabled: true },
       });
@@ -77,14 +77,14 @@ export namespace Telegram {
     }
 
     async registration(payload: Record<string, string>): Promise<void> {
-      this.bot.api.sendMessage(CONSTRAINTS.REGISTRATION_CHAT_ID, this.text('registration', payload), {
+      await this.sendMessageWithRetry(CONSTRAINTS.REGISTRATION_CHAT_ID, this.text('registration', payload), {
         parse_mode: 'HTML',
         link_preview_options: { is_disabled: true },
       });
     }
 
     async dead(domain: string, reason: string): Promise<void> {
-      this.bot.api.sendMessage(CONSTRAINTS.DOMAIN_CHAT_ID, `<strong>⚠️ Домен упал!</strong>\n\Домен <code>${domain}</code> упал в <code>${new Date().toUTCString()}</code> по UTC.\n\nПричина: <code>${reason}</code>`, {
+      await this.sendMessageWithRetry(CONSTRAINTS.DOMAIN_CHAT_ID, `<strong>⚠️ Домен упал!</strong>\n\Домен <code>${domain}</code> упал в <code>${new Date().toUTCString()}</code> по UTC.\n\nПричина: <code>${reason}</code>`, {
         parse_mode: 'HTML',
         link_preview_options: { is_disabled: true },
         reply_markup: {
@@ -96,10 +96,32 @@ export namespace Telegram {
     }
 
     async alive(domain: string): Promise<void> {
-      this.bot.api.sendMessage(CONSTRAINTS.DOMAIN_CHAT_ID, `<strong>✅ Домен ожил!</strong>\n\n Домен <code>${domain}</code> ожил в <code>${new Date().toUTCString()}</code> по UTC`, {
+      await this.sendMessageWithRetry(CONSTRAINTS.DOMAIN_CHAT_ID, `<strong>✅ Домен ожил!</strong>\n\n Домен <code>${domain}</code> ожил в <code>${new Date().toUTCString()}</code> по UTC`, {
         parse_mode: 'HTML',
         link_preview_options: { is_disabled: true }
       });
+    }
+
+    private async retryOn429<T>(fn: () => Promise<T>): Promise<T> {
+      try {
+        return await fn();
+      } catch (error) {
+        if (error.error_code === 429 && error.parameters?.retry_after) {
+          const retryAfter = error.parameters.retry_after * 1000;
+          await new Promise(resolve => setTimeout(resolve, retryAfter));
+          return await fn();
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    private async sendMessageWithRetry(chatId: string, text: string, options?: any) {
+      return this.retryOn429(() => this.bot.api.sendMessage(chatId, text, options));
+    }
+
+    private async editMessageTextWithRetry(chatId: string, messageId: number, text: string, options?: any) {
+      return this.retryOn429(() => this.bot.api.editMessageText(chatId, messageId, text, options));
     }
 
     private async updateDomain(domain: string, action: 'add' | 'delete', ctx?: any) {
