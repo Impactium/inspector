@@ -72,6 +72,8 @@ export namespace Telegram {
         link_preview_options: { is_disabled: true },
       });
 
+      if (!msg) return;
+
       const timer = setTimeout(() => this.cache.delete(payload.commit), Telegram.Cache.TTL);
       this.cache.set(payload.commit, { message: msg.message_id, timer, text });
     }
@@ -102,16 +104,16 @@ export namespace Telegram {
       });
     }
 
-    private async retryOn429<T>(fn: () => Promise<T>): Promise<T> {
+    private async retryOn429<T>(fn: () => Promise<T>): Promise<T | null> {
       try {
-        return await fn();
+        return await new Promise(resolve => setTimeout(() => fn().then(resolve), Math.random() * 5000))
       } catch (error) {
         if (error.error_code === 429 && error.parameters?.retry_after) {
           const retryAfter = error.parameters.retry_after * 1000;
           await new Promise(resolve => setTimeout(resolve, retryAfter));
           return await fn();
         } else {
-          throw error;
+          return null;
         }
       }
     }
