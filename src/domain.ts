@@ -18,7 +18,7 @@ export namespace Domain {
       private readonly telegramService: Telegram.Service
     ) { }
 
-    @Cron(CronExpression.EVERY_MINUTE)
+    // @Cron(CronExpression.EVERY_MINUTE)
     async checkAll() {
       const domains = await Storage.get();
       Domain.Service.logger.log(`DOMAINS_LIST:${domains.size}`);
